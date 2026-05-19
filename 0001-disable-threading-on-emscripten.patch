@@ -1,52 +1,6 @@
-From: Arrow R WASM fix <arrow@apache.org>
-Subject: [PATCH] GH-XXXXX: [R] Disable threading paths on Emscripten/WASM
-
-On Emscripten (webR), pthread_create is not supported and will fail with
-"thread constructor failed: Not supported". This affects two code paths:
-
-1. RunWithCapturedRIfPossible() submits work to the IO thread pool
-   executor, which attempts to spawn a thread even when
-   ARROW_ENABLE_THREADING=OFF (the IO pool is separate from the CPU pool).
-
-2. RTasks constructs a ThreadedTaskGroup via GetCpuThreadPool() when
-   use_threads=TRUE.
-
-Fix both by:
-- Making CanRunWithCapturedR() return false on __EMSCRIPTEN__, so all
-  parquet/feather/CSV reads go through the synchronous path.
-- Forcing arrow.use_threads=FALSE on Emscripten in .onLoad, so RTasks
-  never attempts threaded execution.
-
-This ensures read_parquet(as_data_frame=FALSE) correctly returns an
-Arrow Table (instead of crashing) and eliminates the spurious thread
-error on WASM.
----
- r/R/arrow-package.R             | 5 +++++
- r/src/safe-call-into-r-impl.cpp | 8 +++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/r/R/arrow-package.R b/r/R/arrow-package.R
-index abcdef1..1234567 100644
---- a/r/R/arrow-package.R
-+++ b/r/R/arrow-package.R
-@@ -149,6 +149,11 @@
-   # We can't do this at package build time because list_compute_functions()
-   # needs the C++ library loaded
-   create_binding_cache()
- 
-+  if (identical(R.version$os, "emscripten")) {
-+    # Disable multithreading on WASM/Emscripten (no pthread support)
-+    options(arrow.use_threads = FALSE)
-+  }
-+
-   if (tolower(Sys.info()[["sysname"]]) == "windows") {
-     # Disable multithreading on Windows
-     # See https://issues.apache.org/jira/browse/ARROW-8379
-diff --git a/r/src/safe-call-into-r-impl.cpp b/r/src/safe-call-into-r-impl.cpp
-index abcdef2..1234568 100644
 --- a/r/src/safe-call-into-r-impl.cpp
 +++ b/r/src/safe-call-into-r-impl.cpp
-@@ -46,7 +46,15 @@ bool SetEnableSignalStopSource(bool enabled) {
+@@ -45,7 +45,16 @@
  }
  
  // [[arrow::export]]
@@ -64,6 +18,17 @@ index abcdef2..1234568 100644
  
  // [[arrow::export]]
  std::string TestSafeCallIntoR(cpp11::function r_fun_that_returns_a_string,
--- 
-2.39.0
-
+--- a/r/R/arrow-package.R
++++ b/r/R/arrow-package.R
+@@ -149,6 +149,11 @@
+   # needs the C++ library loaded
+   create_binding_cache()
+ 
++  if (identical(R.version$os, "emscripten")) {
++    # Disable multithreading on WASM/Emscripten (no pthread support)
++    options(arrow.use_threads = FALSE)
++  }
++
+   if (tolower(Sys.info()[["sysname"]]) == "windows") {
+     # Disable multithreading on Windows
+     # See https://issues.apache.org/jira/browse/ARROW-8379

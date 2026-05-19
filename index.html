@@ -83,6 +83,8 @@
       padding: 16px;
       max-height: 500px;
       overflow-y: auto;
+      user-select: text;
+      cursor: text;
     }
     #output {
       font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
@@ -276,10 +278,11 @@
         }
 
         // Run the demo commands
-        run('# Read penguins parquet file');
-        run('penguins <- read_parquet("/data/penguins.parquet")');
+        run('# Read penguins parquet as an Arrow Table');
+        run('penguins <- read_parquet("/data/penguins.parquet", as_data_frame = FALSE)');
+        run('penguins');
         run('');
-        run('# Split-apply-combine: mean measurements by species');
+        run('# Split-apply-combine using Arrow compute (no R materialization)');
         run('penguins |>');
         run('  group_by(species) |>');
         run('  summarise(');
@@ -288,7 +291,8 @@
         run('    avg_bill_dep = mean(bill_dep, na.rm = TRUE),');
         run('    avg_flipper_len = mean(flipper_len, na.rm = TRUE),');
         run('    avg_body_mass = mean(body_mass, na.rm = TRUE)');
-        run('  )');
+        run('  ) |>');
+        run('  collect()');
 
       } catch (err) {
         stepEl.textContent = '❌ Error';
@@ -303,6 +307,7 @@
     function sendInput() {
       const code = inputEl.value;
       inputEl.value = '';
+      // Echo the command (Console doesn't echo stdin)
       appendOutput(inputPromptEl.textContent + code, 'stdout');
       webRConsole.stdin(code);
     }
@@ -311,8 +316,12 @@
       if (evt.key === 'Enter') sendInput();
     });
 
-    // Keep focus on input when clicking anywhere in terminal
-    terminalEl.addEventListener('click', () => inputEl.focus());
+    // Focus input on click only if user isn't selecting text
+    terminalEl.addEventListener('mouseup', () => {
+      if (!window.getSelection().toString()) {
+        inputEl.focus();
+      }
+    });
   </script>
 </body>
 </html>

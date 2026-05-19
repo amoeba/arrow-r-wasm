@@ -84,6 +84,8 @@
       padding: 16px;
       max-height: 600px;
       overflow-y: auto;
+      user-select: text;
+      cursor: text;
     }
     #output {
       font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
@@ -255,6 +257,7 @@
     function sendInput() {
       const code = inputEl.value;
       inputEl.value = '';
+      // Echo the command (Console doesn't echo stdin)
       appendOutput(inputPromptEl.textContent + code, 'stdout');
       webRConsole.stdin(code);
     }
@@ -263,7 +266,11 @@
       if (evt.key === 'Enter') sendInput();
     });
 
-    terminalEl.addEventListener('click', () => inputEl.focus());
+    terminalEl.addEventListener('mouseup', () => {
+      if (!window.getSelection().toString()) {
+        inputEl.focus();
+      }
+    });
   </script>
 </body>
 </html>
