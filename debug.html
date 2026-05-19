@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Arrow R WASM - Debug</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f8f9fa;
+    }
+    h1 { color: #333; }
+    p.note { color: #666; font-size: 14px; margin-bottom: 20px; }
+
+    /* Loading overlay */
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      text-align: center;
+    }
+    #loading .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e9ecef;
+      border-top-color: #007bff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading .step {
+      font-size: 16px;
+      color: #495057;
+      margin-bottom: 8px;
+    }
+    #loading .substep {
+      font-size: 13px;
+      color: #868e96;
+    }
+    #loading .steps-done {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #adb5bd;
+      line-height: 1.8;
+    }
+    #loading .steps-done .done {
+      color: #28a745;
+    }
+
+    /* Terminal */
+    #terminal {
+      display: none;
+      position: relative;
+      background: #1e1e1e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #terminal-header {
+      background: #2d2d2d;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #terminal-header .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    #terminal-header .dot.red { background: #ff5f56; }
+    #terminal-header .dot.yellow { background: #ffbd2e; }
+    #terminal-header .dot.green { background: #27c93f; }
+    #terminal-header .title {
+      flex: 1;
+      text-align: center;
+      color: #888;
+      font-size: 12px;
+    }
+    #output-wrapper {
+      padding: 16px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    #output {
+      font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #d4d4d4;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+    .stdout { color: #d4d4d4; }
+    .stderr { color: #f48771; }
+
+    /* Inline input at the cursor */
+    #input-line {
+      display: flex;
+      align-items: center;
+      font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #input-prompt {
+      color: #6cb6ff;
+      user-select: none;
+    }
+    #input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #d4d4d4;
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
+      padding: 0;
+      margin: 0;
+      caret-color: #d4d4d4;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏹 Arrow R WASM - Debug Console</h1>
+  <p class="note">
+    No stderr filtering. Arrow is mounted but not loaded — test <code>library(arrow)</code> manually.
+    Sample data at <code>/data/penguins.parquet</code>.
+  </p>
+
+  <!-- Loading state -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="step" id="load-step">Initializing webR...</div>
+    <div class="substep" id="load-substep">Downloading R WebAssembly runtime</div>
+    <div class="steps-done" id="steps-done"></div>
+  </div>
+
+  <!-- Terminal (hidden until ready) -->
+  <div id="terminal">
+    <div id="terminal-header">
+      <div class="dot red"></div>
+      <div class="dot yellow"></div>
+      <div class="dot green"></div>
+      <div class="title">R — webR (unfiltered stderr)</div>
+    </div>
+    <div id="output-wrapper">
+      <pre id="output"></pre>
+      <div id="input-line">
+        <span id="input-prompt">&gt; </span>
+        <input id="input" type="text" spellcheck="false" autocomplete="off" autofocus>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { Console } from 'https://webr.r-wasm.org/latest/webr.mjs';
+
+    const loadingEl = document.getElementById('loading');
+    const stepEl = document.getElementById('load-step');
+    const substepEl = document.getElementById('load-substep');
+    const stepsDoneEl = document.getElementById('steps-done');
+    const terminalEl = document.getElementById('terminal');
+    const outputEl = document.getElementById('output');
+    const outputWrapper = document.getElementById('output-wrapper');
+    const inputEl = document.getElementById('input');
+    const inputPromptEl = document.getElementById('input-prompt');
+
+    const completedSteps = [];
+
+    function setStep(step, substep) {
+      stepEl.textContent = step;
+      substepEl.textContent = substep || '';
+    }
+
+    function markDone(step) {
+      completedSteps.push(step);
+      stepsDoneEl.innerHTML = completedSteps
+        .map(s => `<span class="done">✓</span> ${s}`)
+        .join('<br>');
+    }
+
+    function appendOutput(text, className = 'stdout') {
+      const span = document.createElement('span');
+      span.className = className;
+      span.textContent = text + '\n';
+      outputEl.appendChild(span);
+      outputWrapper.scrollTop = outputWrapper.scrollHeight;
+    }
+
+    // Create webR console — NO stderr filtering
+    const webRConsole = new Console({
+      stdout: line => appendOutput(line, 'stdout'),
+      stderr: line => appendOutput(line, 'stderr'),
+      prompt: p => {
+        inputPromptEl.textContent = p;
+      },
+    });
+
+    async function initialize() {
+      try {
+        // Step 1: Init webR
+        setStep('Initializing webR...', 'Downloading R WebAssembly runtime');
+        await webRConsole.webR.init();
+        markDone('webR initialized');
+
+        // Step 2: Install deps
+        setStep('Installing Arrow dependencies...', 'R6, rlang, vctrs, purrr, glue, tidyselect, bit64, assertthat');
+        await webRConsole.webR.installPackages(
+          ['R6', 'assertthat', 'bit64', 'glue', 'purrr', 'rlang', 'tidyselect', 'vctrs'],
+          {quiet: true}
+        );
+        markDone('Dependencies installed (8 packages)');
+
+        // Step 3: Mount arrow
+        setStep('Mounting Arrow package...', 'Loading pre-compiled Arrow 24.0.0 for WebAssembly');
+        const baseUrl = window.location.href.replace(/\/[^/]*$/, '/');
+        await webRConsole.webR.evalRVoid(`
+          webr::mount(
+            mountpoint = "/usr/lib/R/library/arrow",
+            source = "${baseUrl}arrow_24.0.0.9000.tgz"
+          )
+        `);
+        markDone('Arrow package mounted');
+
+        // Step 4: Load sample data
+        setStep('Loading sample data...', 'penguins.parquet (5 KB)');
+        const parquetResp = await fetch(baseUrl + 'penguins.parquet');
+        const parquetBuf = new Uint8Array(await parquetResp.arrayBuffer());
+        await webRConsole.webR.FS.mkdir('/data');
+        await webRConsole.webR.FS.writeFile('/data/penguins.parquet', parquetBuf);
+        markDone('Sample data loaded');
+
+        // Ready — reveal terminal, do NOT pre-load arrow
+        loadingEl.style.display = 'none';
+        terminalEl.style.display = 'block';
+        inputEl.focus();
+
+        // Start the console REPL
+        webRConsole.run();
+
+      } catch (err) {
+        stepEl.textContent = '❌ Error';
+        substepEl.textContent = err.message;
+        document.querySelector('.spinner').style.display = 'none';
+      }
+    }
+
+    initialize();
+
+    // Input handling
+    function sendInput() {
+      const code = inputEl.value;
+      inputEl.value = '';
+      appendOutput(inputPromptEl.textContent + code, 'stdout');
+      webRConsole.stdin(code);
+    }
+
+    inputEl.addEventListener('keydown', (evt) => {
+      if (evt.key === 'Enter') sendInput();
+    });
+
+    terminalEl.addEventListener('click', () => inputEl.focus());
+  </script>
+</body>
+</html>
