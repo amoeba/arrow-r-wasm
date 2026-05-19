@@ -190,14 +190,10 @@
       outputWrapper.scrollTop = outputWrapper.scrollHeight;
     }
 
-    // Create webR console
+    // Create webR console — show all stderr (including threading errors)
     const webRConsole = new Console({
       stdout: line => appendOutput(line, 'stdout'),
-      stderr: line => {
-        // Filter harmless WASM threading warning from Arrow C++
-        if (line.includes('thread constructor failed')) return;
-        appendOutput(line, 'stderr');
-      },
+      stderr: line => appendOutput(line, 'stderr'),
       prompt: p => {
         inputPromptEl.textContent = p;
       },
@@ -248,7 +244,6 @@
         await webRConsole.webR.evalRVoid(`
           suppressPackageStartupMessages(library(arrow))
           suppressPackageStartupMessages(library(dplyr))
-          arrow::set_cpu_count(1L)
         `);
         markDone('Arrow + dplyr loaded');
 
@@ -280,6 +275,7 @@
         // Run the demo commands
         run('# Read penguins parquet as an Arrow Table');
         run('penguins <- read_parquet("/data/penguins.parquet", as_data_frame = FALSE)');
+        run('class(penguins)');
         run('penguins');
         run('');
         run('# Split-apply-combine using Arrow compute (no R materialization)');
