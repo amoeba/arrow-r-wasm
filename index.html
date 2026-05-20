@@ -1,323 +1,511 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>Arrow R WASM Demo</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 20px;
-      background: #f8f9fa;
-    }
-    h1 { color: #333; }
+  <head>
+    <meta charset="utf-8" />
+    <title>Arrow R Wasm Demo</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+        background: #f8f9fa;
+      }
+      h1 {
+        color: #333;
+      }
+      p.subtitle {
+        color: #666;
+        font-size: 14px;
+        margin-top: -10px;
+      }
 
-    /* Loading overlay */
-    #loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px;
-      text-align: center;
-    }
-    #loading .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #e9ecef;
-      border-top-color: #007bff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 24px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #loading .step {
-      font-size: 16px;
-      color: #495057;
-      margin-bottom: 8px;
-    }
-    #loading .substep {
-      font-size: 13px;
-      color: #868e96;
-    }
-    #loading .steps-done {
-      margin-top: 16px;
-      font-size: 12px;
-      color: #adb5bd;
-      line-height: 1.8;
-    }
-    #loading .steps-done .done {
-      color: #28a745;
-    }
+      /* Loading overlay */
+      #loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        text-align: center;
+      }
+      #loading .spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e9ecef;
+        border-top-color: #007bff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-bottom: 24px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      #loading .step {
+        font-size: 16px;
+        color: #495057;
+        margin-bottom: 8px;
+      }
+      #loading .substep {
+        font-size: 13px;
+        color: #868e96;
+      }
+      #loading .steps-done {
+        margin-top: 16px;
+        font-size: 12px;
+        color: #adb5bd;
+        line-height: 1.8;
+      }
+      #loading .steps-done .done {
+        color: #28a745;
+      }
 
-    /* Terminal */
-    #terminal {
-      display: none;
-      position: relative;
-      background: #1e1e1e;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    #terminal-header {
-      background: #2d2d2d;
-      padding: 8px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #terminal-header .dot {
-      width: 12px; height: 12px;
-      border-radius: 50%;
-    }
-    #terminal-header .dot.red { background: #ff5f56; }
-    #terminal-header .dot.yellow { background: #ffbd2e; }
-    #terminal-header .dot.green { background: #27c93f; }
-    #terminal-header .title {
-      flex: 1;
-      text-align: center;
-      color: #888;
-      font-size: 12px;
-    }
-    #output-wrapper {
-      padding: 16px;
-      max-height: 500px;
-      overflow-y: auto;
-      user-select: text;
-      cursor: text;
-    }
-    #output {
-      font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
-      font-size: 13px;
-      line-height: 1.5;
-      color: #d4d4d4;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      margin: 0;
-    }
-    .stdout { color: #d4d4d4; }
-    .stderr { color: #f48771; }
-    .comment { color: #6a9955; font-style: italic; }
-    .prompt-color { color: #6cb6ff; }
+      /* Notebook */
+      #notebook {
+        display: none;
+      }
+      .section-header {
+        font-size: 13px;
+        font-weight: 600;
+        color: #495057;
+        margin: 24px 0 8px 0;
+        padding: 8px 12px;
+        background: #e9ecef;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+      }
+      .section-header:first-child {
+        margin-top: 0;
+      }
+      .cell {
+        margin-bottom: 4px;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+      }
+      .cell-code {
+        background: #1e1e1e;
+        padding: 12px 16px;
+        font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #d4d4d4;
+        white-space: pre-wrap;
+        margin: 0;
+      }
+      .cell-code .prompt {
+        color: #6cb6ff;
+        user-select: none;
+      }
+      .cell-code .comment {
+        color: #6a9955;
+        font-style: italic;
+      }
+      .cell-output {
+        background: #f8f9fa;
+        padding: 10px 16px;
+        font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: #212529;
+        white-space: pre-wrap;
+        border-top: 1px solid #dee2e6;
+        margin: 0;
+      }
+      .cell-output:empty {
+        display: none;
+      }
+      .cell-output .stderr {
+        color: #dc3545;
+      }
 
-    /* Inline input at the cursor */
-    #input-line {
-      display: flex;
-      align-items: center;
-      font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    #input-prompt {
-      color: #6cb6ff;
-      user-select: none;
-    }
-    #input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: #d4d4d4;
-      font-family: inherit;
-      font-size: inherit;
-      line-height: inherit;
-      padding: 0;
-      margin: 0;
-      caret-color: #d4d4d4;
-    }
-  </style>
-</head>
-<body>
-  <h1>🏹 Arrow R WASM Demo</h1>
+      /* Interactive REPL at bottom */
+      #repl {
+        margin-top: 24px;
+        background: #1e1e1e;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+      }
+      #repl-header {
+        background: #2d2d2d;
+        padding: 6px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #repl-header .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      #repl-header .dot.red {
+        background: #ff5f56;
+      }
+      #repl-header .dot.yellow {
+        background: #ffbd2e;
+      }
+      #repl-header .dot.green {
+        background: #27c93f;
+      }
+      #repl-header .title {
+        flex: 1;
+        text-align: center;
+        color: #888;
+        font-size: 11px;
+      }
+      #repl-output {
+        padding: 12px 16px;
+        max-height: 300px;
+        overflow-y: auto;
+        font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #d4d4d4;
+        white-space: pre-wrap;
+      }
+      #repl-output .stdout {
+        color: #d4d4d4;
+      }
+      #repl-output .stderr {
+        color: #f48771;
+      }
+      #input-line {
+        display: flex;
+        align-items: center;
+        padding: 0 16px 12px;
+        font-family: "SF Mono", Monaco, "Cascadia Code", "Fira Code", monospace;
+        font-size: 13px;
+      }
+      #input-prompt {
+        color: #6cb6ff;
+        user-select: none;
+      }
+      #input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #d4d4d4;
+        font-family: inherit;
+        font-size: inherit;
+        padding: 0;
+        margin: 0;
+        caret-color: #d4d4d4;
+      }
+    </style>
+  </head>
+  <body>
+    <h1><code>{arrow}</code> Wasm Demo</h1>
+    <p class="subtitle">
+      Basic demo showing the <code>{arrow}</code> R package running under Wasm
+      and zero-copy integration with DuckDB.
+    </p>
 
-  <!-- Loading state -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <div class="step" id="load-step">Initializing webR...</div>
-    <div class="substep" id="load-substep">Downloading R WebAssembly runtime</div>
-    <div class="steps-done" id="steps-done"></div>
-  </div>
-
-  <!-- Terminal (hidden until ready) -->
-  <div id="terminal">
-    <div id="terminal-header">
-      <div class="dot red"></div>
-      <div class="dot yellow"></div>
-      <div class="dot green"></div>
-      <div class="title">R — webR + Arrow</div>
+    <!-- Loading state -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="step" id="load-step">Initializing webR...</div>
+      <div class="substep" id="load-substep">
+        Downloading R WebAssembly runtime
+      </div>
+      <div class="steps-done" id="steps-done"></div>
     </div>
-    <div id="output-wrapper">
-      <pre id="output"></pre>
+
+    <!-- Notebook cells (hidden until ready) -->
+    <div id="notebook"></div>
+
+    <!-- Interactive REPL (hidden until ready) -->
+    <div id="repl" style="display: none">
+      <div id="repl-header">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+        <div class="title">Interactive R console — try your own commands</div>
+      </div>
+      <div id="repl-output"></div>
       <div id="input-line">
         <span id="input-prompt">&gt; </span>
-        <input id="input" type="text" spellcheck="false" autocomplete="off" autofocus>
+        <input id="input" type="text" spellcheck="false" autocomplete="off" />
       </div>
     </div>
-  </div>
 
-  <script type="module">
-    import { Console } from 'https://webr.r-wasm.org/latest/webr.mjs';
+    <script type="module">
+      import { WebR } from "https://webr.r-wasm.org/latest/webr.mjs";
 
-    const loadingEl = document.getElementById('loading');
-    const stepEl = document.getElementById('load-step');
-    const substepEl = document.getElementById('load-substep');
-    const stepsDoneEl = document.getElementById('steps-done');
-    const terminalEl = document.getElementById('terminal');
-    const outputEl = document.getElementById('output');
-    const outputWrapper = document.getElementById('output-wrapper');
-    const inputEl = document.getElementById('input');
-    const inputPromptEl = document.getElementById('input-prompt');
+      const loadingEl = document.getElementById("loading");
+      const stepEl = document.getElementById("load-step");
+      const substepEl = document.getElementById("load-substep");
+      const stepsDoneEl = document.getElementById("steps-done");
+      const notebookEl = document.getElementById("notebook");
+      const replEl = document.getElementById("repl");
+      const replOutput = document.getElementById("repl-output");
+      const inputEl = document.getElementById("input");
+      const inputPromptEl = document.getElementById("input-prompt");
 
-    const completedSteps = [];
+      const completedSteps = [];
 
-    function setStep(step, substep) {
-      stepEl.textContent = step;
-      substepEl.textContent = substep || '';
-    }
+      function setStep(step, substep) {
+        stepEl.textContent = step;
+        substepEl.textContent = substep || "";
+      }
 
-    function markDone(step) {
-      completedSteps.push(step);
-      stepsDoneEl.innerHTML = completedSteps
-        .map(s => `<span class="done">✓</span> ${s}`)
-        .join('<br>');
-    }
+      function markDone(step) {
+        completedSteps.push(step);
+        stepsDoneEl.innerHTML = completedSteps
+          .map((s) => `<span class="done">✓</span> ${s}`)
+          .join("<br>");
+      }
 
-    function appendOutput(text, className = 'stdout') {
-      const span = document.createElement('span');
-      span.className = className;
-      span.textContent = text + '\n';
-      outputEl.appendChild(span);
-      outputWrapper.scrollTop = outputWrapper.scrollHeight;
-    }
+      // --- Notebook cell rendering ---
 
-    // Create webR console — show all stderr (including threading errors)
-    const webRConsole = new Console({
-      stdout: line => appendOutput(line, 'stdout'),
-      stderr: line => appendOutput(line, 'stderr'),
-      prompt: p => {
-        inputPromptEl.textContent = p;
-      },
-    });
+      function addSectionHeader(text) {
+        const el = document.createElement("div");
+        el.className = "section-header";
+        el.textContent = text;
+        notebookEl.appendChild(el);
+      }
 
-    // Load everything, then reveal terminal
-    async function initialize() {
-      try {
-        // Step 1: Init webR
-        setStep('Initializing webR...', 'Downloading R WebAssembly runtime');
-        await webRConsole.webR.init();
-        markDone('webR initialized');
+      function renderCode(code) {
+        // Format code lines with prompts
+        // Use > for new statements, + for continuations
+        const lines = code.split("\n");
+        let html = "";
+        let isContinuation = false;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.startsWith("#")) {
+            html += `<span class="comment">${escapeHtml(line)}</span>\n`;
+            isContinuation = false;
+          } else {
+            const prompt = isContinuation ? "+ " : "> ";
+            html += `<span class="prompt">${prompt}</span>${escapeHtml(line)}\n`;
+            // Line is a continuation if it ends with an operator/pipe/open-paren/comma
+            isContinuation = /[|>%,+\-*/&({]\s*$/.test(line);
+          }
+        }
+        return html.trimEnd();
+      }
 
-        // Step 2: Install deps
-        setStep('Installing Arrow dependencies...', 'R6, rlang, vctrs, purrr, glue, tidyselect, bit64, assertthat');
-        await webRConsole.webR.installPackages(
-          ['R6', 'assertthat', 'bit64', 'glue', 'purrr', 'rlang', 'tidyselect', 'vctrs'],
-          {quiet: true}
-        );
-        markDone('Dependencies installed (8 packages)');
+      function escapeHtml(str) {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
 
-        // Step 3: Mount arrow
-        setStep('Mounting Arrow package...', 'Loading pre-compiled Arrow 24.0.0 for WebAssembly');
-        const baseUrl = window.location.href.replace(/\/[^/]*$/, '/');
-        await webRConsole.webR.evalRVoid(`
+      async function runCell(code, shelter) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+
+        const codeEl = document.createElement("pre");
+        codeEl.className = "cell-code";
+        codeEl.innerHTML = renderCode(code);
+        cell.appendChild(codeEl);
+
+        const outputEl = document.createElement("pre");
+        outputEl.className = "cell-output";
+        cell.appendChild(outputEl);
+
+        notebookEl.appendChild(cell);
+        cell.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+        // Run and capture
+        const result = await shelter.captureR(code, {
+          withAutoprint: true,
+          captureStreams: true,
+          captureConditions: false,
+        });
+
+        // Render output
+        let outputHtml = "";
+        for (const item of result.output) {
+          if (item.type === "stdout") {
+            outputHtml += escapeHtml(item.data) + "\n";
+          } else if (item.type === "stderr") {
+            outputHtml += `<span class="stderr">${escapeHtml(item.data)}</span>\n`;
+          }
+        }
+        outputEl.innerHTML = outputHtml.trimEnd();
+
+        return result;
+      }
+
+      // --- Main ---
+
+      const webR = new WebR();
+
+      async function initialize() {
+        try {
+          // Step 1: Init webR
+          setStep("Initializing webR...", "Downloading R WebAssembly runtime");
+          await webR.init();
+          markDone("webR initialized");
+
+          // Step 2: Install deps
+          setStep(
+            "Installing Arrow dependencies...",
+            "R6, rlang, vctrs, purrr, glue, tidyselect, bit64, assertthat",
+          );
+          await webR.installPackages(
+            [
+              "R6",
+              "assertthat",
+              "bit64",
+              "glue",
+              "purrr",
+              "rlang",
+              "tidyselect",
+              "vctrs",
+            ],
+            { quiet: true },
+          );
+          markDone("Dependencies installed (8 packages)");
+
+          // Step 3: Mount arrow
+          setStep(
+            "Mounting Arrow package...",
+            "Loading pre-compiled Arrow 24.0.0 for WebAssembly",
+          );
+          const baseUrl = window.location.href.replace(/\/[^/]*$/, "/");
+          await webR.evalRVoid(`
           webr::mount(
             mountpoint = "/usr/lib/R/library/arrow",
             source = "${baseUrl}arrow_24.0.0.9000.tgz"
           )
         `);
-        markDone('Arrow package mounted');
+          markDone("Arrow package mounted");
 
-        // Step 4: Load sample data
-        setStep('Loading sample data...', 'penguins.parquet (5 KB)');
-        const parquetResp = await fetch(baseUrl + 'penguins.parquet');
-        const parquetBuf = new Uint8Array(await parquetResp.arrayBuffer());
-        await webRConsole.webR.FS.mkdir('/data');
-        await webRConsole.webR.FS.writeFile('/data/penguins.parquet', parquetBuf);
-        markDone('Sample data loaded');
+          // Step 4: Load sample data
+          setStep("Loading sample data...", "penguins.parquet (5 KB)");
+          const parquetResp = await fetch(baseUrl + "penguins.parquet");
+          const parquetBuf = new Uint8Array(await parquetResp.arrayBuffer());
+          await webR.FS.mkdir("/data");
+          await webR.FS.writeFile("/data/penguins.parquet", parquetBuf);
+          markDone("Sample data loaded");
 
-        // Step 5: Install dplyr
-        setStep('Installing dplyr...', 'For split-apply-combine demo');
-        await webRConsole.webR.installPackages(['dplyr'], {quiet: true});
-        markDone('dplyr installed');
+          // Step 5: Install dplyr + DuckDB
+          setStep(
+            "Installing dplyr + DuckDB...",
+            "dplyr for Arrow compute, DuckDB for SQL over Arrow memory",
+          );
+          await webR.installPackages(["dplyr", "DBI", "duckdb"], {
+            quiet: true,
+          });
+          markDone("dplyr + DuckDB installed");
 
-        // Step 6: Load arrow and dplyr silently during init
-        setStep('Loading libraries...', 'Almost ready');
-        await webRConsole.webR.evalRVoid(`
+          // Step 6: Load libraries
+          setStep("Loading libraries...", "Almost ready");
+          await webR.evalRVoid(`
           suppressPackageStartupMessages(library(arrow))
           suppressPackageStartupMessages(library(dplyr))
+          suppressPackageStartupMessages(library(duckdb))
         `);
-        markDone('Arrow + dplyr loaded');
+          markDone("Arrow + dplyr + DuckDB loaded");
 
-        // All done — reveal terminal and start the REPL
-        loadingEl.style.display = 'none';
-        terminalEl.style.display = 'block';
-        inputEl.focus();
+          // --- Run the demo as notebook cells ---
+          loadingEl.style.display = "none";
+          notebookEl.style.display = "block";
 
-        // Start the console REPL (shows R banner)
-        webRConsole.run();
+          const shelter = await new webR.Shelter();
 
-        // Wait for the banner to finish printing
-        await new Promise(resolve => setTimeout(resolve, 500));
+          // -- Arrow + dplyr section --
+          addSectionHeader("arrow + dplyr");
 
-        // Helper to echo a command then feed it
-        function run(code) {
-          if (code === '') {
-            appendOutput('', 'stdout');
-          } else if (code.startsWith('#')) {
-            appendOutput('> ' + code, 'comment');
-          } else if (code.startsWith(' ')) {
-            appendOutput('+ ' + code, 'stdout');
-          } else {
-            appendOutput('> ' + code, 'stdout');
+          await runCell(
+            `# Read penguins parquet as an Arrow Table (not a data.frame)\npenguins <- read_parquet("/data/penguins.parquet", as_data_frame = FALSE)\npenguins`,
+            shelter,
+          );
+
+          await runCell(
+            `# Split-apply-combine using Arrow compute engine\npenguins |>\n  group_by(species) |>\n  summarise(\n    n = n(),\n    avg_bill_len = mean(bill_len, na.rm = TRUE),\n    avg_body_mass = mean(body_mass, na.rm = TRUE)\n  ) |>\n  collect()`,
+            shelter,
+          );
+
+          // -- Arrow + DuckDB section --
+          addSectionHeader(
+            "arrow + DuckDB — zero-copy scan via shared WASM memory",
+          );
+
+          await runCell(
+            `# Create DuckDB connection and register the Arrow Table\ncon <- dbConnect(duckdb())\nduckdb_register_arrow(con, "penguins", penguins)`,
+            shelter,
+          );
+
+          await runCell(
+            `# DuckDB queries Arrow memory directly — no copy, no serialization\ndbGetQuery(con, "\n  SELECT species,\n         COUNT(*) as n,\n         ROUND(AVG(body_mass), 1) as avg_mass,\n         MIN(body_mass) as min_mass,\n         MAX(body_mass) as max_mass\n  FROM penguins\n  WHERE body_mass IS NOT NULL\n  GROUP BY species\n  ORDER BY avg_mass DESC\n")`,
+            shelter,
+          );
+
+          await runCell(
+            `# Cleanup\nduckdb_unregister_arrow(con, "penguins")\ndbDisconnect(con, shutdown = TRUE)`,
+            shelter,
+          );
+
+          shelter.purge();
+
+          // --- Show interactive REPL ---
+          replEl.style.display = "block";
+          inputEl.focus();
+        } catch (err) {
+          stepEl.textContent = "❌ Error";
+          substepEl.textContent = err.message;
+          document.querySelector(".spinner").style.display = "none";
+          console.error(err);
+        }
+      }
+
+      initialize();
+
+      // --- Interactive REPL using shelter.captureR ---
+
+      function appendRepl(text, className = "stdout") {
+        const span = document.createElement("span");
+        span.className = className;
+        span.textContent = text + "\n";
+        replOutput.appendChild(span);
+        replOutput.scrollTop = replOutput.scrollHeight;
+      }
+
+      async function sendInput() {
+        const code = inputEl.value.trim();
+        if (!code) return;
+        inputEl.value = "";
+        inputEl.disabled = true;
+
+        appendRepl("> " + code, "stdout");
+
+        try {
+          const shelter = await new webR.Shelter();
+          const result = await shelter.captureR(code, {
+            withAutoprint: true,
+            captureStreams: true,
+            captureConditions: false,
+          });
+          for (const item of result.output) {
+            appendRepl(item.data, item.type);
           }
-          webRConsole.stdin(code);
+          shelter.purge();
+        } catch (e) {
+          appendRepl(e.message, "stderr");
         }
 
-        // Run the demo commands
-        run('# Read penguins parquet as an Arrow Table');
-        run('penguins <- read_parquet("/data/penguins.parquet", as_data_frame = FALSE)');
-        run('class(penguins)');
-        run('penguins');
-        run('');
-        run('# Split-apply-combine using Arrow compute (no R materialization)');
-        run('penguins |>');
-        run('  group_by(species) |>');
-        run('  summarise(');
-        run('    n = n(),');
-        run('    avg_bill_len = mean(bill_len, na.rm = TRUE),');
-        run('    avg_bill_dep = mean(bill_dep, na.rm = TRUE),');
-        run('    avg_flipper_len = mean(flipper_len, na.rm = TRUE),');
-        run('    avg_body_mass = mean(body_mass, na.rm = TRUE)');
-        run('  ) |>');
-        run('  collect()');
-
-      } catch (err) {
-        stepEl.textContent = '❌ Error';
-        substepEl.textContent = err.message;
-        document.querySelector('.spinner').style.display = 'none';
-      }
-    }
-
-    initialize();
-
-    // Input handling — type directly into the terminal
-    function sendInput() {
-      const code = inputEl.value;
-      inputEl.value = '';
-      // Echo the command (Console doesn't echo stdin)
-      appendOutput(inputPromptEl.textContent + code, 'stdout');
-      webRConsole.stdin(code);
-    }
-
-    inputEl.addEventListener('keydown', (evt) => {
-      if (evt.key === 'Enter') sendInput();
-    });
-
-    // Focus input on click only if user isn't selecting text
-    terminalEl.addEventListener('mouseup', () => {
-      if (!window.getSelection().toString()) {
+        inputEl.disabled = false;
         inputEl.focus();
       }
-    });
-  </script>
-</body>
+
+      inputEl.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter") sendInput();
+      });
+
+      replEl.addEventListener("mouseup", () => {
+        if (!window.getSelection().toString()) {
+          inputEl.focus();
+        }
+      });
+    </script>
+  </body>
 </html>
